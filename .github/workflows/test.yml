@@ -23,8 +23,8 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install Project Dependencies
-        run: npm install ./frontend/
+      # - name: Install Project Dependencies
+      #   run: npm install $GITHUB_WORKSPACE/frontend
 
       - name: Install Python 3.10
         uses: actions/setup-python@v4
