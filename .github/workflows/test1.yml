@@ -67,11 +67,11 @@ jobs:
         with:
           name: scancode-results
           path: scancode-results.json
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: scancode-results
-      - name: Display structure of downloaded files
-        run: ls -R
+      # - name: Download Artifact
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: scancode-results
+      # - name: Display structure of downloaded files
+      #   run: ls -R
           
 
