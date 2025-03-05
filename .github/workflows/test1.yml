@@ -84,7 +84,7 @@ jobs:
         with:
           name: scancode-results
       - name: Display structure of downloaded files
-        run: ls -R
+        run: ls -la $GITHUB_WORKSPACE
     
     
     
