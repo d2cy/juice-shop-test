@@ -83,10 +83,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scancode-results
-      - name: Display structure of downloaded files
+      - name: Display Output
         run: |
           ls -la $GITHUB_WORKSPACE
           cat $GITHUB_WORKSPACE/scancode-results.json
+      - name: Display Output after filtering
+        run: cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}'
+        
         
     
     
