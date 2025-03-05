@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  scan_frontend:
+  scan_frontend:  #Job1
     name: Scan frontend Dependencies
     runs-on: ubuntu-latest
 
@@ -74,7 +74,7 @@ jobs:
       # - name: Display structure of downloaded files
       #   run: ls -R
 
-  download_artifacts:
+  download_artifacts: #Job2
     needs: scan_frontend
     runs-on: ubuntu-latest
     name: Download Artifacts
