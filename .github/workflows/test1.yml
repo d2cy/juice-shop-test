@@ -73,5 +73,20 @@ jobs:
       #     name: scancode-results
       # - name: Display structure of downloaded files
       #   run: ls -R
+
+  download_artifacts:
+    needs: scan_frontend
+    runs-on: ubuntu-latest
+    name: Download Artifacts
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: scancode-results
+      - name: Display structure of downloaded files
+        run: ls -R
+    
+    
+    
           
 
