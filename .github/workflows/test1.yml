@@ -79,16 +79,16 @@ jobs:
     runs-on: ubuntu-latest
     name: Download Artifacts
     steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: scancode-results
-      - name: Display Output
-        run: |
-          ls -la $GITHUB_WORKSPACE
-          cat $GITHUB_WORKSPACE/scancode-results.json
-      - name: Display Output after filtering
-        run: cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}' | tee scancode_results.json
+      # - name: Download Artifacts
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: scancode-results
+      # - name: Display Output
+      #   run: |
+      #     ls -la $GITHUB_WORKSPACE
+      #     cat $GITHUB_WORKSPACE/scancode-results.json
+      # - name: Display Output after filtering
+      #   run: cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}' | tee scancode_results.json
       - name: Send data to WebHook
         # run: curl -X POST -H 'Content-Type:application/json' -d `cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}'` ${{ secrets.GOOGLE_WEBHOOK_URL }}
         run: echo ${{ env.GOOGLE }}
