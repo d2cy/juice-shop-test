@@ -96,7 +96,7 @@ jobs:
               }]
             }')
 
-            curl -X POST -H "Content-Type: application/json" -d "$MESSAGE_JSON" "https://chat.googleapis.com/v1/spaces/AAAAiHLUdQk/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=jRNaHg-WTR_vKN1zXBtY1v4EvYlLUfWJ-4EDEC6C3ao"
+            curl -X POST -H "Content-Type: application/json" -d "$MESSAGE_JSON" "${{ secrets.GOOGLE_WEBHOOK }}"
 
             sleep 1  # Prevents rate limiting
           done
