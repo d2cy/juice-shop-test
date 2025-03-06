@@ -64,7 +64,7 @@ jobs:
       - name: Run Copyright Extraction and Send to Google Chat
         run: |
           jq -c '[.files[]
-            | {path, copyrights: [.copyrights[] | {text: "<b>Copyright:</b> \(.copyright) (Line: \(.start_line))"}]}
+            | {path, copyrights: [.copyrights[] | {text: "<b>Copyright:</b> \(.copyright) </br><b>Line:</b> \(.start_line))"}]}
             | select(.copyrights != [])
           ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
 
