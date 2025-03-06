@@ -61,12 +61,52 @@ jobs:
       - name: Debug - Check if results file exists
         run: ls -l scancode-results.json || echo "scancode-results.json NOT FOUND"
 
+      - name: Run Copyright Extraction and Send to Google Chat
+        run: |
+          jq -c '[.files[]
+            | {path, copyrights: [.copyrights[] | {text: "<b>Copyright:</b> \(.copyright) (Line: \(.start_line))"}]}
+            | select(.copyrights != [])
+          ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
 
-      - name: Upload Scan Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: scancode-results
-          path: scancode-results.json
+          jq -c '.[]' chunks.json | while read -r chunk; do
+            MESSAGE_JSON=$(jq -nc --argjson chunk "$chunk" '{
+              cardsV2: [{
+                cardId: "copyright_report",
+                card: {
+                  header: {
+                    title: "Copyright Report",
+                    subtitle: "Extracted Copyright Information"
+                  },
+                  sections: [
+                    {
+                      widgets: [
+                        {
+                          textParagraph: {
+                            text: (
+                              [$chunk[]
+                                | "<b>Path:</b> \(.path)<br>\(.copyrights[].text)"]
+                              | join("<br><br>")
+                            )
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }]
+            }')
+
+            curl -X POST -H "Content-Type: application/json" -d "$MESSAGE_JSON" "https://chat.googleapis.com/v1/spaces/AAAAiHLUdQk/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=jRNaHg-WTR_vKN1zXBtY1v4EvYlLUfWJ-4EDEC6C3ao"
+
+            sleep 1  # Prevents rate limiting
+          done
+
+
+      # - name: Upload Scan Results
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: scancode-results
+      #     path: scancode-results.json
       # - name: Download Artifact
       #   uses: actions/download-artifact@v4
       #   with:
@@ -74,24 +114,24 @@ jobs:
       # - name: Display structure of downloaded files
       #   run: ls -R
 
-  download_artifacts: #Job2
-    needs: scan_frontend
-    runs-on: ubuntu-latest
-    name: Download Artifacts
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: scancode-results
-      - name: Display Output
-        run: |
-          ls -la $GITHUB_WORKSPACE
-          cat $GITHUB_WORKSPACE/scancode-results.json
-      - name: Display Output after filtering
-        run: cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}' | tee scancode_results.json
-      - name: Send data to WebHook
-        run: curl -X POST -H 'Content-Type:application/json' -d `cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}'` "https://chat.googleapis.com/v1/spaces/AAAAiHLUdQk/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=jRNaHg-WTR_vKN1zXBtY1v4EvYlLUfWJ-4EDEC6C3ao"
-        # run: echo ${{ secrets.GOOGLE }}
+  # download_artifacts: #Job2
+  #   needs: scan_frontend
+  #   runs-on: ubuntu-latest
+  #   name: Download Artifacts
+  #   steps:
+  #     - name: Download Artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: scancode-results
+  #     - name: Display Output
+  #       run: |
+  #         ls -la $GITHUB_WORKSPACE
+  #         cat $GITHUB_WORKSPACE/scancode-results.json
+  #     - name: Display Output after filtering
+  #       run: cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}' | tee scancode_results.json
+  #     - name: Send data to WebHook
+  #       run: curl -X POST -H 'Content-Type:application/json' -d `cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}'` "https://chat.googleapis.com/v1/spaces/AAAAiHLUdQk/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=jRNaHg-WTR_vKN1zXBtY1v4EvYlLUfWJ-4EDEC6C3ao"
+  #       # run: echo ${{ secrets.GOOGLE }}
         
     
     
