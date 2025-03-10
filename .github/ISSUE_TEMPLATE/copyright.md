@@ -1,8 +1,11 @@
+---
 name: "🚨 Copyright Violation"
-description: "Report a copyright violation detected by the scanning tool."
-title: "🚨 Copyright Violation - <Brief Description>"
+about: Report a copyright violation detected by the scanning tool.
+title: ' '
 labels: ["copyright", "violation", "investigation"]
-assignees: []
+assignees: ''
+
+---
 
 body:
   - type: input
