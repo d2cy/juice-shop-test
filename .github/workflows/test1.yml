@@ -75,7 +75,7 @@ jobs:
               cardsV2: [{
                 cardId: "copyright_report",
                 card: {
-                  header: { title: "📢 Copyright Report", subtitle: "Branch: ${{ github.ref_name }}" },
+                  header: { title: "📢 Copyright Report", subtitle: "Extracted Copyright Information , Branch: ${{ github.ref_name }}" },
                   sections: [
                     {
                       widgets: [
@@ -83,8 +83,8 @@ jobs:
                           textParagraph: {
                             text: (
                               [$chunk[]
-                                | "🔹 <b>File:</b> <a href=\"\(.url)\">\(.url)</a><br>🔹 <b>Copyright:</b> \(.copyrights[].text)<br>🔹 <b>Line:</b> \(.copyrights[].line)"]
-                              | join("<br><br>⬜⬜<br><br>")
+                                | "<b>File:</b> <a href=\"\(.url)\">\(.url)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].line)"]
+                              | join("<br><br><br><br>")
                             )
                           }
                         }
