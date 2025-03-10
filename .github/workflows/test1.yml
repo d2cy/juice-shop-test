@@ -84,7 +84,7 @@ jobs:
                           textParagraph: {
                             text: (
                               [$chunk[]
-                                | "<b>Path:</b> \(.path)<br>\(.copyrights[].text)"]
+                                | "<b>URL:</b> <a href="${{ github.server_url }}/${{ github.repository }}/\(.path)">Click Here</a><br>\(.copyrights[].text)"]
                               | join("<br><br>")
                             )
                           }
