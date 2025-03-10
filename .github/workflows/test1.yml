@@ -83,7 +83,7 @@ jobs:
                           textParagraph: {
                             text: (
                               [$chunk[]
-                                | "<b>File:</b> <a href=\"\(.url)#L(.copyrights[].line)\">\(.url)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].line)"]
+                                | "<b>File:</b> <a href=\"\(.url)#L\(.copyrights[].line)\">\(.url)#\(.copyrights[].line)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].line)"]
                               | join("<br><br><br><br>")
                             )
                           }
