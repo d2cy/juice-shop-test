@@ -74,7 +74,7 @@ jobs:
             | select(.copyrights != [])
           ]' scancode-results.json > current_copyrights.json
 
-          - name: Fetch Existing GitHub Issues
+      - name: Fetch Existing GitHub Issues
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
