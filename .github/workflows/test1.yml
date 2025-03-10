@@ -63,42 +63,86 @@ jobs:
       - name: Debug - Check if results file exists
         run: ls -l scancode-results.json || echo "scancode-results.json NOT FOUND"
 
-      - name: Run Copyright Extraction and Send to Google Chat
+      - name: Extract Copyright Data
+        env:
+          BASE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}"  
         run: |
           jq -c --arg base_url "$BASE_URL" '[.files[]
-            | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]}
+            | {url: ($base_url + "/" + .path), path: .path, 
+               copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]
+            }
             | select(.copyrights != [])
-          ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
+          ]' scancode-results.json > current_copyrights.json
 
-          jq -c '.[]' chunks.json | while read -r chunk; do
-            MESSAGE_JSON=$(jq -nc --argjson chunk "$chunk" '{
-              cardsV2: [{
-                cardId: "copyright_report",
-                card: {
-                  header: { title: "📢 Copyright Report", subtitle: "Extracted Copyright Information , Branch: ${{ github.ref_name }}" },
-                  sections: [
-                    {
-                      widgets: [
-                        {
-                          textParagraph: {
-                            text: (
-                              [$chunk[]
-                                | "<b>File:</b> <a href=\"\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)\">\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].start_line)"]
-                              | join("<br><br><br><br>")
-                            )
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }]
-            }')
+          - name: Fetch Existing GitHub Issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list --state open --limit 100 --json title,body > existing_issues.json
 
-            curl -X POST -H "Content-Type: application/json" -d "$MESSAGE_JSON" "${{ secrets.GOOGLE_WEBHOOK }}"
+      - name: Find New Copyrights (Using Hashing)
+        run: |
+          jq -r '[.[] | .url + "||" + (.copyrights[] | .text + "||" + (.start_line | tostring))] | join("\n")' current_copyrights.json | sha256sum | awk '{print $1}' > current_hash.txt
+          
+          jq -r '[.[] | .title + "||" + .body] | join("\n")' existing_issues.json | sha256sum | awk '{print $1}' > existing_hash.txt
 
-            sleep 1  # Prevents rate limiting
+          if cmp -s current_hash.txt existing_hash.txt; then
+            echo "NO_NEW_ISSUES=true" >> $GITHUB_ENV
+          else
+            echo "NO_NEW_ISSUES=false" >> $GITHUB_ENV
+          fi
+
+      - name: Create GitHub Issues for New Copyrights
+        if: env.NO_NEW_ISSUES == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          jq -c '.[]' current_copyrights.json | while read -r issue; do
+            URL=$(echo "$issue" | jq -r '.url')
+            PATH=$(echo "$issue" | jq -r '.path')
+            COPYRIGHTS=$(echo "$issue" | jq -r '[.copyrights[] | "- **Line " + .start_line + "**: " + .text] | join("\n")')
+
+            gh issue create \
+              --title "$URL" \
+              --body "**File:** $PATH\n\n$COPYRIGHTS" \
+              --label "copyright-violation"
           done
+
+      # - name: Run Copyright Extraction and Send to Google Chat
+      #   run: |
+      #     jq -c --arg base_url "$BASE_URL" '[.files[]
+      #       | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]}
+      #       | select(.copyrights != [])
+      #     ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
+      #     jq -c '.[]' chunks.json | while read -r chunk; do
+      #       MESSAGE_JSON=$(jq -nc --argjson chunk "$chunk" '{
+      #         cardsV2: [{
+      #           cardId: "copyright_report",
+      #           card: {
+      #             header: { title: "📢 Copyright Report", subtitle: "Extracted Copyright Information , Branch: ${{ github.ref_name }}" },
+      #             sections: [
+      #               {
+      #                 widgets: [
+      #                   {
+      #                     textParagraph: {
+      #                       text: (
+      #                         [$chunk[]
+      #                           | "<b>File:</b> <a href=\"\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)\">\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].start_line)"]
+      #                         | join("<br><br><br><br>")
+      #                       )
+      #                     }
+      #                   }
+      #                 ]
+      #               }
+      #             ]
+      #           }
+      #         }]
+      #       }')
+
+      #       curl -X POST -H "Content-Type: application/json" -d "$MESSAGE_JSON" "${{ secrets.GOOGLE_WEBHOOK }}"
+
+      #       sleep 1  # Prevents rate limiting
+      #     done
 
 
       # - name: Upload Scan Results
