@@ -73,13 +73,20 @@ jobs:
             }
             | select(.copyrights != [])
           ]' scancode-results.json > current_copyrights.json
+          
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: current_copyrights
+          path: current_copyrights.json
+        
 
-      - name: Fetch Existing GitHub Issues
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh issue list --state open --limit 100 --json title,body > existing_issues.json
-          cat existing_issues.json
+      # - name: Fetch Existing GitHub Issues
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     gh issue list --state open --limit 100 --json title,body > existing_issues.json
+      #     cat existing_issues.json
 
       # - name: Find New Copyrights (Using Hashing)
       #   run: |
@@ -109,15 +116,13 @@ jobs:
       #         --label "copyright-violation"
       #     done
 
-      - name: Run Copyright Extraction and Send to Google Chat
-        run: |
-          jq -c --arg base_url "$BASE_URL" '[.files[]
-            | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]}
-            | select(.copyrights != [])
-          ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
-          jq -c '.[]' chunks.json 
-          cat chunks.json
-          # | while read -r chunk; do
+      # - name: Run Copyright Extraction and Send to Google Chat
+      #   run: |
+      #     jq -c --arg base_url "$BASE_URL" '[.files[]
+      #       | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]}
+      #       | select(.copyrights != [])
+      #     ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
+      #     jq -c '.[]' chunks.json | while read -r chunk; do
       #       MESSAGE_JSON=$(jq -nc --argjson chunk "$chunk" '{
       #         cardsV2: [{
       #           cardId: "copyright_report",
@@ -147,16 +152,19 @@ jobs:
       #       sleep 1  # Prevents rate limiting
       #     done
 
-
-      - name: Upload Scan Results
-        uses: actions/upload-artifact@v4
-        with:
-          name: chunks
-          path: chunks.json
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: scancode-results
+      # - name: Create Github Issues
+      #   run : |
+      #     cat chunks.json | while read -r chunk; do
+          
+      # - name: Upload Scan Results
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: chunks
+      #     path: chunks.json
+      # - name: Download Artifact
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: scancode-results
       # - name: Display structure of downloaded files
       #   run: ls -R
 
