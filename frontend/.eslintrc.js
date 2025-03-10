@@ -7,6 +7,10 @@ module.exports = {
   extends: [
     'standard-with-typescript'
   ],
+/*
+ * Copyright (c) D2Cy.
+ * SPDX-License-Identifier: MIT
+ */
   root: true,
   parserOptions: {
     project: './src/tsconfig.*.json',
