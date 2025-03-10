@@ -79,6 +79,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue list --state open --limit 100 --json title,body > existing_issues.json
+          cat existing_issues.json
 
       - name: Find New Copyrights (Using Hashing)
         run: |
