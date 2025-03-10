@@ -66,7 +66,7 @@ jobs:
       - name: Run Copyright Extraction and Send to Google Chat
         run: |
           jq -c --arg base_url "$BASE_URL" '[.files[]
-            | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", line: "\(.start_line)"}]}
+            | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]}
             | select(.copyrights != [])
           ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
 
@@ -83,7 +83,7 @@ jobs:
                           textParagraph: {
                             text: (
                               [$chunk[]
-                                | "<b>File:</b> <a href=\"\(.url)#L\(.copyrights[].line)\">\(.url)#\(.copyrights[].line)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].line)"]
+                                | "<b>File:</b> <a href=\"\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)\">\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].start_line)"]
                               | join("<br><br><br><br>")
                             )
                           }
