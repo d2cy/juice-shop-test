@@ -3,6 +3,7 @@ name: frontend License & Security Scan
 on:
   push:
     branches:
+      - master
       - main
   pull_request:
     branches:
@@ -67,7 +68,7 @@ jobs:
           jq -c --arg base_url "$BASE_URL" '[.files[]
             | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", line: "\(.start_line)"}]}
             | select(.copyrights != [])
-          ]' input.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
+          ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
 
           jq -c '.[]' chunks.json | while read -r chunk; do
             MESSAGE_JSON=$(jq -nc --argjson chunk "$chunk" '{
