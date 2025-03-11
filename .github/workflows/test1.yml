@@ -83,31 +83,32 @@ jobs:
           total_files=$(jq '.files | length' final-results.json)
           chunk_size=10
           chunk_index=0
+          total_chunks=$(( (total_files + chunk_size - 1) / chunk_size ))  # Correctly calculate total chunks
 
           echo "Total files to process: $total_files"
+          echo "Total chunks to be created: $total_chunks"
 
-          # If total files are less than chunk_size, create one chunk only
-          if [ "$total_files" -le "$chunk_size" ]; then
-            cp final-results.json json_chunks/chunk_0.json
-            echo "✅ Created a single chunk_0.json with all $total_files files"
-          else
-            while [ $chunk_index -lt $(( (total_files + chunk_size - 1) / chunk_size )) ]; do
+          while [ "$chunk_index" -lt "$total_chunks" ]; do
               start=$(( chunk_index * chunk_size ))
-
-              # Debugging: Print the range being processed
               echo "🔹 Processing chunk $chunk_index (Files $start to $((start + chunk_size - 1)))"
 
-              # Capture errors from jq
+              # Run jq and check if it fails
+              chunk_file="json_chunks/chunk_$chunk_index.json"
               if ! jq --argjson start "$start" --argjson size "$chunk_size" \
-                  '{files: (.files[$start:($start + $size)])}' final-results.json > "json_chunks/chunk_$chunk_index.json"; then
-                echo "❌ Error creating chunk_$chunk_index.json at range $start - $((start + chunk_size - 1))"
+                  '{files: (.files[$start:($start + $size)])}' final-results.json > "$chunk_file"; then
+                echo "❌ Error creating $chunk_file at range $start - $((start + chunk_size - 1))"
                 exit 1
               fi
 
-              echo "✅ Successfully created chunk_$chunk_index.json"
+              # Check if chunk is empty (failsafe)
+              if [ "$(jq '.files | length' "$chunk_file")" -eq 0 ]; then
+                  echo "⚠️ Warning: Empty chunk detected at $chunk_file. Exiting!"
+                  exit 1
+              fi
+
+              echo "✅ Successfully created $chunk_file"
               ((chunk_index++))
-            done
-          fi
+          done
 
           echo "🎉 All chunks created successfully!"
 
