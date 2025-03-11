@@ -75,40 +75,46 @@ jobs:
           path: final-results.json
       - name: Split JSON into Chunks of 10 Files Each
         run: |
-          set -e  # Exit on error
+          set -e  # Exit on first error
           set -x  # Print commands for debugging
-
+          
           mkdir -p json_chunks
-
+          
           total_files=$(jq '.files | length' final-results.json)
           chunk_size=10
           chunk_index=0
-          total_chunks=$(( (total_files + chunk_size - 1) / chunk_size ))  # Correctly calculate total chunks
-
-          echo "Total files to process: $total_files"
-          echo "Total chunks to be created: $total_chunks"
-
+          total_chunks=$(( (total_files + chunk_size - 1) / chunk_size ))  # Proper calculation
+          
+          echo "📂 Total files: $total_files"
+          echo "📦 Total chunks to create: $total_chunks"
+          
           while [ "$chunk_index" -lt "$total_chunks" ]; do
               start=$(( chunk_index * chunk_size ))
-              echo "🔹 Processing chunk $chunk_index (Files $start to $((start + chunk_size - 1)))"
-
-              # Run jq and check if it fails
               chunk_file="json_chunks/chunk_$chunk_index.json"
+          
+              echo "🔹 Processing chunk $chunk_index (Files $start to $((start + chunk_size - 1)))"
+          
+              # Run jq with error handling
               if ! jq --argjson start "$start" --argjson size "$chunk_size" \
                   '{files: (.files[$start:($start + $size)])}' final-results.json > "$chunk_file"; then
-                echo "❌ Error creating $chunk_file at range $start - $((start + chunk_size - 1))"
-                exit 1
-              fi
-
-              # Check if chunk is empty (failsafe)
-              if [ "$(jq '.files | length' "$chunk_file")" -eq 0 ]; then
-                  echo "⚠️ Warning: Empty chunk detected at $chunk_file. Exiting!"
+                  echo "❌ Error creating $chunk_file"
                   exit 1
               fi
-
-              echo "✅ Successfully created $chunk_file"
+          
+              # Check if chunk is empty
+              chunk_size_actual=$(jq '.files | length' "$chunk_file")
+              if [ "$chunk_size_actual" -eq 0 ]; then
+                  echo "⚠️ Empty chunk detected: $chunk_file. Skipping!"
+                  rm "$chunk_file"  # Remove empty chunk
+                  ((chunk_index++))
+                  continue
+              fi
+          
+              echo "✅ Successfully created $chunk_file with $chunk_size_actual files"
               ((chunk_index++))
           done
+          
+          echo "🎉 All chunks created successfully!"
 
       - name: Upload JSON Chunks as Artifacts
         uses: actions/upload-artifact@v4
