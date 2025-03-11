@@ -1,0 +1,126 @@
+name: "frontend License & Security Scan"
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  BASE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}"
+
+jobs:
+  scan_frontend:
+    name: Scan frontend Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Download and Extract ScanCode Toolkit v32.0.8
+        run: |
+          wget https://github.com/aboutcode-org/scancode-toolkit/releases/download/v32.0.8/scancode-toolkit-v32.0.8_py3.10-linux.tar.gz
+          tar -xzf scancode-toolkit-v32.0.8_py3.10-linux.tar.gz
+          mv scancode-toolkit-v32.0.8 scancode-toolkit
+          chmod +x scancode-toolkit/scancode
+          chmod +x scancode-toolkit/configure
+
+      - name: Configure ScanCode Toolkit
+        run: |
+          cd scancode-toolkit
+          ./configure
+
+      - name: Verify Python Version
+        run: python --version
+
+      - name: Run ScanCode on frontend Folder
+        run: |
+          cd scancode-toolkit
+          ./scancode --copyright -n 2 --json ../scancode-results.json $GITHUB_WORKSPACE/frontend/ || (echo "ScanCode failed!" && exit 1)
+
+      - name: Debug - Check if results file exists
+        run: ls -l scancode-results.json || echo "scancode-results.json NOT FOUND"
+
+      - name: Filter JSON Data (Remove empty copyrights)
+        run: |
+          jq '{files: [(.files[] | select(.copyrights | length > 0))]}' scancode-results.json > filtered-results.json
+
+      - name: Update Path to URL format
+        run: |
+          jq --arg baseUrl "$BASE_URL" '
+            {files: [ 
+              .files[] | 
+              .URL = ($baseUrl + "/" + .path) 
+              | del(.path)
+            ]}' filtered-results.json > final-results.json
+
+      - name: Show Processed JSON
+        run: cat final-results.json
+
+      - name: Upload Processed JSON as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-json
+          path: final-results.json
+
+      - name: Split JSON into Chunks of 10 Files Each
+        run: |
+          set -e
+          set -x
+          mkdir -p json_chunks
+          
+          total_files=$(jq '.files | length' final-results.json)
+          chunk_size=10
+          chunk_index=0
+          total_chunks=$(( (total_files + chunk_size - 1) / chunk_size ))
+          
+          echo "📂 Total files: $total_files"
+          echo "📦 Total chunks to create: $total_chunks"
+          
+          while [ "$chunk_index" -lt "$total_chunks" ]; do
+              start=$(( chunk_index * chunk_size ))
+              chunk_file="json_chunks/chunk_$chunk_index.json"
+              
+              echo "🔹 Processing chunk $chunk_index (Files $start to $((start + chunk_size - 1)))"
+              
+              if ! jq --argjson start "$start" --argjson size "$chunk_size" \
+                  '{files: (.files[$start:($start + $size)])}' final-results.json > "$chunk_file"; then
+                  echo "❌ Error creating $chunk_file"
+                  exit 1
+              fi
+              
+              chunk_size_actual=$(jq '.files | length' "$chunk_file")
+              if [ "$chunk_size_actual" -eq 0 ]; then
+                  echo "⚠️ Empty chunk detected: $chunk_file. Skipping!"
+                  rm -f "$chunk_file"
+                  ((chunk_index++))
+                  continue
+              fi
+              
+              echo "✅ Successfully created $chunk_file with $chunk_size_actual files"
+              ((chunk_index++))
+          done
+          
+          echo "🎉 All chunks created successfully!"
+          exit 0
+
+      - name: Upload JSON Chunks as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: json-chunks
+          path: json_chunks/
