@@ -75,6 +75,9 @@ jobs:
           path: final-results.json
       - name: Split JSON into Chunks of 10 Files Each
         run: |
+          set -e  # Exit on error
+          set -x  # Print commands for debugging
+
           mkdir -p json_chunks
 
           total_files=$(jq '.files | length' final-results.json)
@@ -90,13 +93,23 @@ jobs:
           else
             while [ $chunk_index -lt $(( (total_files + chunk_size - 1) / chunk_size )) ]; do
               start=$(( chunk_index * chunk_size ))
-              jq --argjson start "$start" --argjson size "$chunk_size" '
-                {files: (.files[$start:($start + $size)])}' final-results.json > "json_chunks/chunk_$chunk_index.json"
 
-              echo "✅ Created chunk_$chunk_index.json"
+              # Debugging: Print the range being processed
+              echo "🔹 Processing chunk $chunk_index (Files $start to $((start + chunk_size - 1)))"
+
+              # Capture errors from jq
+              if ! jq --argjson start "$start" --argjson size "$chunk_size" \
+                  '{files: (.files[$start:($start + $size)])}' final-results.json > "json_chunks/chunk_$chunk_index.json"; then
+                echo "❌ Error creating chunk_$chunk_index.json at range $start - $((start + chunk_size - 1))"
+                exit 1
+              fi
+
+              echo "✅ Successfully created chunk_$chunk_index.json"
               ((chunk_index++))
             done
           fi
+
+          echo "🎉 All chunks created successfully!"
 
       - name: Upload JSON Chunks as Artifacts
         uses: actions/upload-artifact@v4
