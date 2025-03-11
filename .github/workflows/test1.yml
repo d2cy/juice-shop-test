@@ -19,25 +19,14 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
-
-      # - name: Install Project Dependencies
-      #   run: npm install $GITHUB_WORKSPACE/frontend
-
       - name: Install Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      # - name: Install ScanCode Dependencies
-      #   run: |
-      #     sudo apt-get update && sudo apt-get upgrade -y
-      #     sudo apt install -y bzip2 xz-utils zlib1g libxml2-dev libxslt1-dev libpopt0
-
       - name: Download and Extract ScanCode Toolkit v32.0.8
         run: |
           wget https://github.com/aboutcode-org/scancode-toolkit/releases/download/v32.0.8/scancode-toolkit-v32.0.8_py3.10-linux.tar.gz
@@ -45,15 +34,14 @@ jobs:
           mv scancode-toolkit-v32.0.8 scancode-toolkit
           chmod +x scancode-toolkit/scancode
           chmod +x scancode-toolkit/configure
-
       - name: Configure ScanCode Toolkit
         run: |
           cd scancode-toolkit
           ./configure
-
       - name: Verify Python Version
         run: python --version
 
+#####################################################
       - name: Run ScanCode on frontend Folder
         run: |
           cd scancode-toolkit
@@ -63,129 +51,250 @@ jobs:
       - name: Debug - Check if results file exists
         run: ls -l scancode-results.json || echo "scancode-results.json NOT FOUND"
 
-      - name: Extract Copyright Data
-        env:
-          BASE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}"  
+######################################################
+
+      - name: Filter JSON Data (Remove empty copyrights)
         run: |
-          jq -c --arg base_url "$BASE_URL" '[.files[]
-            | {url: ($base_url + "/" + .path), path: .path, 
-               copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]
-            }
-            | select(.copyrights != [])
-          ]' scancode-results.json > current_copyrights.json
-          
-      - name: Upload Scan Results
+          jq '{files: [(.files[] | select(.copyrights | length > 0))]}' scancode-results.json > filtered-results.json
+      - name: Update Path to URL format
+        run: |
+          jq --arg baseUrl "$BASE_URL" '
+            {files: [ 
+              .files[] | 
+              .URL = ($baseUrl + "/" + .path) 
+              | del(.path)
+            ]}' filtered-results.json > final-results.json
+
+      - name: Show Processed JSON
+        run: cat final-results.json
+
+      - name: Upload Processed JSON as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: current_copyrights
-          path: current_copyrights.json
+          name: final-json
+          path: final-results.json
+      - name: Split JSON into Chunks of 10 Files Each
+        run: |
+          mkdir -p json_chunks
+
+          total_files=$(jq '.files | length' final-results.json)
+          chunk_size=10
+          chunk_index=0
+
+          echo "Total files to process: $total_files"
+
+          # If total files are less than chunk_size, create one chunk only
+          if [ "$total_files" -le "$chunk_size" ]; then
+            cp final-results.json json_chunks/chunk_0.json
+            echo "✅ Created a single chunk_0.json with all $total_files files"
+          else
+            while [ $chunk_index -lt $(( (total_files + chunk_size - 1) / chunk_size )) ]; do
+              start=$(( chunk_index * chunk_size ))
+              jq --argjson start "$start" --argjson size "$chunk_size" '
+                {files: (.files[$start:($start + $size)])}' final-results.json > "json_chunks/chunk_$chunk_index.json"
+
+              echo "✅ Created chunk_$chunk_index.json"
+              ((chunk_index++))
+            done
+          fi
+
+      - name: Upload JSON Chunks as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: json-chunks
+          path: json_chunks/
+          
+    
+
+
+# name: frontend License & Security Scan
+
+# on:
+#   push:
+#     branches:
+#       - master
+#       - main
+#   pull_request:
+#     branches:
+#       - main
+#   workflow_dispatch:
+# env:
+#   BASE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}"
+# jobs:
+#   scan_frontend:  #Job1
+#     name: Scan frontend Dependencies
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v4
+
+#       - name: Set up Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       # - name: Install Project Dependencies
+#       #   run: npm install $GITHUB_WORKSPACE/frontend
+
+#       - name: Install Python 3.10
+#         uses: actions/setup-python@v4
+#         with:
+#           python-version: '3.10'
+
+#       # - name: Install ScanCode Dependencies
+#       #   run: |
+#       #     sudo apt-get update && sudo apt-get upgrade -y
+#       #     sudo apt install -y bzip2 xz-utils zlib1g libxml2-dev libxslt1-dev libpopt0
+
+#       - name: Download and Extract ScanCode Toolkit v32.0.8
+#         run: |
+#           wget https://github.com/aboutcode-org/scancode-toolkit/releases/download/v32.0.8/scancode-toolkit-v32.0.8_py3.10-linux.tar.gz
+#           tar -xzf scancode-toolkit-v32.0.8_py3.10-linux.tar.gz
+#           mv scancode-toolkit-v32.0.8 scancode-toolkit
+#           chmod +x scancode-toolkit/scancode
+#           chmod +x scancode-toolkit/configure
+
+#       - name: Configure ScanCode Toolkit
+#         run: |
+#           cd scancode-toolkit
+#           ./configure
+
+#       - name: Verify Python Version
+#         run: python --version
+
+#       - name: Run ScanCode on frontend Folder
+#         run: |
+#           cd scancode-toolkit
+#           # ./scancode --json scancode-results.json ../frontend
+#           ./scancode  --copyright -n 2 --json ../scancode-results.json $GITHUB_WORKSPACE/frontend/ || (echo "ScanCode failed!" && exit 1)
+          
+#       - name: Debug - Check if results file exists
+#         run: ls -l scancode-results.json || echo "scancode-results.json NOT FOUND"
+
+#       - name: Extract Copyright Data
+#         env:
+#           BASE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}"  
+#         run: |
+#           jq -c --arg base_url "$BASE_URL" '[.files[]
+#             | {url: ($base_url + "/" + .path), path: .path, 
+#                copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]
+#             }
+#             | select(.copyrights != [])
+#           ]' scancode-results.json > current_copyrights.json
+          
+#       - name: Upload Scan Results
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: current_copyrights
+#           path: current_copyrights.json
         
 
-      # - name: Fetch Existing GitHub Issues
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: |
-      #     gh issue list --state open --limit 100 --json title,body > existing_issues.json
-      #     cat existing_issues.json
+#       # - name: Fetch Existing GitHub Issues
+#       #   env:
+#       #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#       #   run: |
+#       #     gh issue list --state open --limit 100 --json title,body > existing_issues.json
+#       #     cat existing_issues.json
 
-      # - name: Find New Copyrights (Using Hashing)
-      #   run: |
-      #     jq -r '[.[] | .url + "||" + (.copyrights[] | .text + "||" + (.start_line | tostring))] | join("\n")' current_copyrights.json | sha256sum | awk '{print $1}' > current_hash.txt
+#       # - name: Find New Copyrights (Using Hashing)
+#       #   run: |
+#       #     jq -r '[.[] | .url + "||" + (.copyrights[] | .text + "||" + (.start_line | tostring))] | join("\n")' current_copyrights.json | sha256sum | awk '{print $1}' > current_hash.txt
           
-      #     jq -r '[.[] | .title + "||" + .body] | join("\n")' existing_issues.json | sha256sum | awk '{print $1}' > existing_hash.txt
+#       #     jq -r '[.[] | .title + "||" + .body] | join("\n")' existing_issues.json | sha256sum | awk '{print $1}' > existing_hash.txt
 
-      #     if cmp -s current_hash.txt existing_hash.txt; then
-      #       echo "NO_NEW_ISSUES=true" >> $GITHUB_ENV
-      #     else
-      #       echo "NO_NEW_ISSUES=false" >> $GITHUB_ENV
-      #     fi
+#       #     if cmp -s current_hash.txt existing_hash.txt; then
+#       #       echo "NO_NEW_ISSUES=true" >> $GITHUB_ENV
+#       #     else
+#       #       echo "NO_NEW_ISSUES=false" >> $GITHUB_ENV
+#       #     fi
 
-      # - name: Create GitHub Issues for New Copyrights
-      #   if: env.NO_NEW_ISSUES == 'false'
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: |
-      #     jq -c '.[]' current_copyrights.json | while read -r issue; do
-      #       URL=$(echo "$issue" | jq -r '.url')
-      #       PATH=$(echo "$issue" | jq -r '.path')
-      #       COPYRIGHTS=$(echo "$issue" | jq -r '[.copyrights[] | "- **Line " + .start_line + "**: " + .text] | join("\n")')
+#       # - name: Create GitHub Issues for New Copyrights
+#       #   if: env.NO_NEW_ISSUES == 'false'
+#       #   env:
+#       #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#       #   run: |
+#       #     jq -c '.[]' current_copyrights.json | while read -r issue; do
+#       #       URL=$(echo "$issue" | jq -r '.url')
+#       #       PATH=$(echo "$issue" | jq -r '.path')
+#       #       COPYRIGHTS=$(echo "$issue" | jq -r '[.copyrights[] | "- **Line " + .start_line + "**: " + .text] | join("\n")')
 
-      #       gh issue create \
-      #         --title "$URL" \
-      #         --body "**File:** $PATH\n\n$COPYRIGHTS" \
-      #         --label "copyright-violation"
-      #     done
+#       #       gh issue create \
+#       #         --title "$URL" \
+#       #         --body "**File:** $PATH\n\n$COPYRIGHTS" \
+#       #         --label "copyright-violation"
+#       #     done
 
-      - name: Run Copyright Extraction and Send to Google Chat
-        run: |
-          jq -c --arg base_url "$BASE_URL" '[.files[]
-            | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]}
-            | select(.copyrights != [])
-          ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
-          jq -c '.[]' chunks.json | while read -r chunk; do
-            MESSAGE_JSON=$(jq -nc --argjson chunk "$chunk" '{
-              cardsV2: [{
-                cardId: "copyright_report",
-                card: {
-                  header: { title: "📢 Copyright Report", subtitle: "Extracted Copyright Information , Branch: ${{ github.ref_name }}" },
-                  sections: [
-                    {
-                      widgets: [
-                        {
-                          textParagraph: {
-                            text: (
-                              [$chunk[]
-                                | "<b>File:</b> <a href=\"\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)\">\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].start_line)"]
-                              | join("<br><br><br><br>")
-                            )
-                          }
-                        }
-                      ]
-                    }
-                  ]
-                }
-              }]
-            }')
+#       - name: Run Copyright Extraction and Send to Google Chat
+#         run: |
+#           jq -c --arg base_url "$BASE_URL" '[.files[]
+#             | {url: ($base_url + "/" + .path), copyrights: [.copyrights[] | {text: "\(.copyright)", start_line: "\(.start_line)", end_line: "\(.end_line)"}]}
+#             | select(.copyrights != [])
+#           ]' scancode-results.json | jq -c '. as $all | reduce range(0; length; 10) as $i ([]; . + [$all[$i:$i+10]])' > chunks.json
+#           jq -c '.[]' chunks.json | while read -r chunk; do
+#             MESSAGE_JSON=$(jq -nc --argjson chunk "$chunk" '{
+#               cardsV2: [{
+#                 cardId: "copyright_report",
+#                 card: {
+#                   header: { title: "📢 Copyright Report", subtitle: "Extracted Copyright Information , Branch: ${{ github.ref_name }}" },
+#                   sections: [
+#                     {
+#                       widgets: [
+#                         {
+#                           textParagraph: {
+#                             text: (
+#                               [$chunk[]
+#                                 | "<b>File:</b> <a href=\"\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)\">\(.url)#L\(.copyrights[].start_line)-L\(.copyrights[].end_line)</a><br><b>Copyright:</b> \(.copyrights[].text)<br><b>Line:</b> \(.copyrights[].start_line)"]
+#                               | join("<br><br><br><br>")
+#                             )
+#                           }
+#                         }
+#                       ]
+#                     }
+#                   ]
+#                 }
+#               }]
+#             }')
 
-            curl -X POST -H "Content-Type: application/json" -d "$MESSAGE_JSON" "${{ secrets.GOOGLE_WEBHOOK }}"
+#             curl -X POST -H "Content-Type: application/json" -d "$MESSAGE_JSON" "${{ secrets.GOOGLE_WEBHOOK }}"
 
-            sleep 1  # Prevents rate limiting
-          done
+#             sleep 1  # Prevents rate limiting
+#           done
 
-      # - name: Create Github Issues
-      #   run : |
-      #     cat chunks.json | while read -r chunk; do
+#       # - name: Create Github Issues
+#       #   run : |
+#       #     cat chunks.json | while read -r chunk; do
           
-      # - name: Upload Scan Results
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: chunks
-      #     path: chunks.json
-      # - name: Download Artifact
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: scancode-results
-      # - name: Display structure of downloaded files
-      #   run: ls -R
+#       # - name: Upload Scan Results
+#       #   uses: actions/upload-artifact@v4
+#       #   with:
+#       #     name: chunks
+#       #     path: chunks.json
+#       # - name: Download Artifact
+#       #   uses: actions/download-artifact@v4
+#       #   with:
+#       #     name: scancode-results
+#       # - name: Display structure of downloaded files
+#       #   run: ls -R
 
-  # download_artifacts: #Job2
-  #   needs: scan_frontend
-  #   runs-on: ubuntu-latest
-  #   name: Download Artifacts
-  #   steps:
-  #     - name: Download Artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: scancode-results
-  #     - name: Display Output
-  #       run: |
-  #         ls -la $GITHUB_WORKSPACE
-  #         cat $GITHUB_WORKSPACE/scancode-results.json
-  #     - name: Display Output after filtering
-  #       run: cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}' | tee scancode_results.json
-  #     - name: Send data to WebHook
-  #       run: curl -X POST -H 'Content-Type:application/json' -d `cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}'` "https://chat.googleapis.com/v1/spaces/AAAAiHLUdQk/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=jRNaHg-WTR_vKN1zXBtY1v4EvYlLUfWJ-4EDEC6C3ao"
-  #       # run: echo ${{ secrets.GOOGLE }}
+#   # download_artifacts: #Job2
+#   #   needs: scan_frontend
+#   #   runs-on: ubuntu-latest
+#   #   name: Download Artifacts
+#   #   steps:
+#   #     - name: Download Artifacts
+#   #       uses: actions/download-artifact@v4
+#   #       with:
+#   #         name: scancode-results
+#   #     - name: Display Output
+#   #       run: |
+#   #         ls -la $GITHUB_WORKSPACE
+#   #         cat $GITHUB_WORKSPACE/scancode-results.json
+#   #     - name: Display Output after filtering
+#   #       run: cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}' | tee scancode_results.json
+#   #     - name: Send data to WebHook
+#   #       run: curl -X POST -H 'Content-Type:application/json' -d `cat $GITHUB_WORKSPACE/scancode-results.json | jq '.files[] | select((.copyrights | length > 0)) | {path, copyrights}'` "https://chat.googleapis.com/v1/spaces/AAAAiHLUdQk/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=jRNaHg-WTR_vKN1zXBtY1v4EvYlLUfWJ-4EDEC6C3ao"
+#   #       # run: echo ${{ secrets.GOOGLE }}
         
     
     
