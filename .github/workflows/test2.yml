@@ -1,4 +1,4 @@
-name: "frontend License & Security Scan"
+name: "Frontend License & Security Scan"
 
 on:
   push:
@@ -14,8 +14,8 @@ env:
   BASE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}"
 
 jobs:
-  scan_frontend:
-    name: Scan frontend Dependencies
+  scan_and_notify:
+    name: Scan Frontend Dependencies and Notify
     runs-on: ubuntu-latest
 
     steps:
@@ -48,19 +48,19 @@ jobs:
       - name: Verify Python Version
         run: python --version
 
-      - name: Run ScanCode on frontend Folder
+      - name: Run ScanCode on Frontend Folder
         run: |
           cd scancode-toolkit
-          ./scancode --copyright -n 2 --json ../scancode-results.json $GITHUB_WORKSPACE/frontend/ || (echo "ScanCode failed!" && exit 1)
+          ./scancode --copyright -n 2 --json ../scancode-results.json "$GITHUB_WORKSPACE/frontend/" || (echo "ScanCode failed!" && exit 1)
 
-      - name: Debug - Check if results file exists
+      - name: Debug - Check if Results File Exists
         run: ls -l scancode-results.json || echo "scancode-results.json NOT FOUND"
 
-      - name: Filter JSON Data (Remove empty copyrights)
+      - name: Filter JSON Data (Remove Empty Copyrights)
         run: |
           jq '{files: [(.files[] | select(.copyrights | length > 0))]}' scancode-results.json > filtered-results.json
 
-      - name: Update Path to URL format
+      - name: Update File URLs in JSON
         run: |
           jq --arg baseUrl "$BASE_URL" '
             {files: [ 
@@ -78,49 +78,37 @@ jobs:
           name: final-json
           path: final-results.json
 
-      - name: Split JSON into Chunks of 10 Files Each
+      - name: Send JSON Data to Google Chat Webhook in Chunks
+        shell: bash
+        env:
+          WEBHOOK_URL: ${{ secrets.GOOGLE_WEBHOOK }}
+          # Adjust CHUNK_SIZE (number of characters per chunk) as needed.
+          CHUNK_SIZE: 3000
         run: |
+          #!/usr/bin/env bash
           set -e
           set -x
-          mkdir -p json_chunks
           
-          total_files=$(jq '.files | length' final-results.json)
-          chunk_size=10
-          chunk_index=0
-          total_chunks=$(( (total_files + chunk_size - 1) / chunk_size ))
+          FILE="final-results.json"
+          if [ ! -f "$FILE" ]; then
+            echo "File $FILE not found, exiting."
+            exit 1
+          fi
           
-          echo "📂 Total files: $total_files"
-          echo "📦 Total chunks to create: $total_chunks"
-          
-          while [ "$chunk_index" -lt "$total_chunks" ]; do
-              start=$(( chunk_index * chunk_size ))
-              chunk_file="json_chunks/chunk_$chunk_index.json"
-              
-              echo "🔹 Processing chunk $chunk_index (Files $start to $((start + chunk_size - 1)))"
-              
-              if ! jq --argjson start "$start" --argjson size "$chunk_size" \
-                  '{files: (.files[$start:($start + $size)])}' final-results.json > "$chunk_file"; then
-                  echo "❌ Error creating $chunk_file"
-                  exit 1
-              fi
-              
-              chunk_size_actual=$(jq '.files | length' "$chunk_file")
-              if [ "$chunk_size_actual" -eq 0 ]; then
-                  echo "⚠️ Empty chunk detected: $chunk_file. Skipping!"
-                  rm -f "$chunk_file"
-                  ((chunk_index++))
-                  continue
-              fi
-              
-              echo "✅ Successfully created $chunk_file with $chunk_size_actual files"
-              ((chunk_index++))
+          CONTENT=$(cat "$FILE")
+          TOTAL_LEN=${#CONTENT}
+          echo "Total content length: $TOTAL_LEN"
+          INDEX=0
+          CHUNK_NUM=0
+          while [ $INDEX -lt $TOTAL_LEN ]; do
+            CHUNK=${CONTENT:$INDEX:$CHUNK_SIZE}
+            # Build the JSON payload for Google Chat webhook.
+            JSON_PAYLOAD=$(jq -n --arg text "$CHUNK" '{text: $text}')
+            echo "Sending chunk #$CHUNK_NUM (index $INDEX):"
+            echo "$JSON_PAYLOAD"
+            # Send the chunk using curl.
+            curl -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "$WEBHOOK_URL"
+            INDEX=$((INDEX + CHUNK_SIZE))
+            CHUNK_NUM=$((CHUNK_NUM + 1))
           done
-          
-          echo "🎉 All chunks created successfully!"
-          exit 0
-
-      - name: Upload JSON Chunks as Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: json-chunks
-          path: json_chunks/
+          echo "All chunks sent successfully!"
