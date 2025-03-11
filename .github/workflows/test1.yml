@@ -107,7 +107,7 @@ jobs:
               fi
 
               echo "✅ Successfully created $chunk_file"
-              ((chunk_index++))
+              chunk_index=$chunk_index+1
           done
 
           echo "🎉 All chunks created successfully!"
