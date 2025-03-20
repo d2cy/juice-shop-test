@@ -119,6 +119,35 @@ jobs:
               -d "{\"text\": $MESSAGE}" "$GOOGLE_CHAT_WEBHOOK"
             sleep 2  # Avoid hitting rate limits
           done
+      - name: Create GitHub Issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TITLE="📌 Copyright Check Report - $(date +'%Y-%m-%d')"
+          DESCRIPTION=$(jq -Rs '.' output.txt)  # Convert file content to a GitHub-safe JSON string
+
+          curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "{\"title\": \"$TITLE\", \"body\": $DESCRIPTION}" \
+            "https://api.github.com/repos/${{ github.repository }}/issues"
+      # - name: Create JIRA Ticket
+      #   env:
+      #     JIRA_URL: ${{ secrets.JIRA_URL }}
+      #     JIRA_USER: ${{ secrets.JIRA_USER }}
+      #     JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      #     JIRA_PROJECT_KEY: "SEC"  # Change this to your JIRA project key
+      #     JIRA_ISSUE_TYPE: "Task"  # Change to "Bug" or "Story" if needed
+      #   run: |
+      #     SUMMARY="Copyright Check Report - $(date +'%Y-%m-%d')"
+      #     DESCRIPTION=$(jq -Rs '.' output.txt)  # Convert file content to a JIRA-safe JSON string
+
+      #     PAYLOAD=$(jq -n --arg summary "$SUMMARY" --arg description "$DESCRIPTION" --arg project "$JIRA_PROJECT_KEY" --arg type "$JIRA_ISSUE_TYPE" \
+      #       '{fields: { project: { key: $project }, summary: $summary, description: $description, issuetype: { name: $type } } }')
+
+      #     curl -X POST -H "Content-Type: application/json" \
+      #       -u "$JIRA_USER:$JIRA_API_TOKEN" \
+      #       --data "$PAYLOAD" \
+      #       "$JIRA_URL/rest/api/2/issue/"
       # - name: Send JSON Data to Google Chat Webhook in Chunks
       #   shell: bash
       #   env:
