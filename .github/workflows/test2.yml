@@ -84,6 +84,41 @@ jobs:
         with:
           name: final-output
           path: output.txt
+
+      - name: Split Output into Chunks
+        id: split_output
+        run: |
+          CHUNK_SIZE=3000  # Limit chunk size (~4000 characters per Google Chat message)
+          OUTPUT_FILE="output.txt"
+          CHUNK_FILE="chunk.txt"
+          i=1
+          rm -f chunks_*.txt  # Clean previous chunks if any
+
+          while read -r line; do
+            echo "$line" >> "$CHUNK_FILE"
+            if [ $(wc -c <"$CHUNK_FILE") -ge $CHUNK_SIZE ]; then
+              mv "$CHUNK_FILE" "chunks_$i.txt"
+              i=$((i+1))
+              > "$CHUNK_FILE"
+            fi
+          done < "$OUTPUT_FILE"
+
+          if [ -s "$CHUNK_FILE" ]; then
+            mv "$CHUNK_FILE" "chunks_$i.txt"
+          fi
+
+          echo "TOTAL_CHUNKS=$i" >> $GITHUB_ENV
+
+      - name: Send Chunks to Google Chat
+        env:
+          GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_WEBHOOK }}
+        run: |
+          for file in chunks_*.txt; do
+            MESSAGE=$(jq -Rs '.' "$file")  # Convert text to JSON-safe string
+            curl -X POST -H "Content-Type: application/json" \
+              -d "{\"text\": $MESSAGE}" "$GOOGLE_CHAT_WEBHOOK"
+            sleep 2  # Avoid hitting rate limits
+          done
       # - name: Send JSON Data to Google Chat Webhook in Chunks
       #   shell: bash
       #   env:
@@ -95,12 +130,11 @@ jobs:
       #     set -e
       #     set -x
           
-      #     FILE="final-results.json"
+      #     FILE="output.txt"
       #     if [ ! -f "$FILE" ]; then
       #       echo "File $FILE not found, exiting."
       #       exit 1
       #     fi
-          
       #     CONTENT=$(cat "$FILE")
       #     TOTAL_LEN=${#CONTENT}
       #     echo "Total content length: $TOTAL_LEN"
