@@ -77,38 +77,44 @@ jobs:
         with:
           name: final-json
           path: final-results.json
-
-      - name: Send JSON Data to Google Chat Webhook in Chunks
-        shell: bash
-        env:
-          WEBHOOK_URL: ${{ secrets.GOOGLE_WEBHOOK }}
-          # Adjust CHUNK_SIZE (number of characters per chunk) as needed.
-          CHUNK_SIZE: 3000
-        run: |
-          #!/usr/bin/env bash
-          set -e
-          set -x
+      - name: Process JSON
+        run: jq -r '.files[] | .URL as $url | .copyrights[] | "\(.copyright) - \($url)#L\(.start_line)-L\(.end_line)"' final-results.json > output.txt
+      - name: Upload Processed JSON as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-output
+          path: output.txt
+      # - name: Send JSON Data to Google Chat Webhook in Chunks
+      #   shell: bash
+      #   env:
+      #     WEBHOOK_URL: ${{ secrets.GOOGLE_WEBHOOK }}
+      #     # Adjust CHUNK_SIZE (number of characters per chunk) as needed.
+      #     CHUNK_SIZE: 3000
+      #   run: |
+      #     #!/usr/bin/env bash
+      #     set -e
+      #     set -x
           
-          FILE="final-results.json"
-          if [ ! -f "$FILE" ]; then
-            echo "File $FILE not found, exiting."
-            exit 1
-          fi
+      #     FILE="final-results.json"
+      #     if [ ! -f "$FILE" ]; then
+      #       echo "File $FILE not found, exiting."
+      #       exit 1
+      #     fi
           
-          CONTENT=$(cat "$FILE")
-          TOTAL_LEN=${#CONTENT}
-          echo "Total content length: $TOTAL_LEN"
-          INDEX=0
-          CHUNK_NUM=0
-          while [ $INDEX -lt $TOTAL_LEN ]; do
-            CHUNK=${CONTENT:$INDEX:$CHUNK_SIZE}
-            # Build the JSON payload for Google Chat webhook.
-            JSON_PAYLOAD=$(jq -n --arg text "$CHUNK" '{text: $text}')
-            echo "Sending chunk #$CHUNK_NUM (index $INDEX):"
-            echo "$JSON_PAYLOAD"
-            # Send the chunk using curl.
-            curl -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "$WEBHOOK_URL"
-            INDEX=$((INDEX + CHUNK_SIZE))
-            CHUNK_NUM=$((CHUNK_NUM + 1))
-          done
-          echo "All chunks sent successfully!"
+      #     CONTENT=$(cat "$FILE")
+      #     TOTAL_LEN=${#CONTENT}
+      #     echo "Total content length: $TOTAL_LEN"
+      #     INDEX=0
+      #     CHUNK_NUM=0
+      #     while [ $INDEX -lt $TOTAL_LEN ]; do
+      #       CHUNK=${CONTENT:$INDEX:$CHUNK_SIZE}
+      #       # Build the JSON payload for Google Chat webhook.
+      #       JSON_PAYLOAD=$(jq -n --arg text "$CHUNK" '{text: $text}')
+      #       echo "Sending chunk #$CHUNK_NUM (index $INDEX):"
+      #       echo "$JSON_PAYLOAD"
+      #       # Send the chunk using curl.
+      #       curl -X POST -H "Content-Type: application/json" -d "$JSON_PAYLOAD" "$WEBHOOK_URL"
+      #       INDEX=$((INDEX + CHUNK_SIZE))
+      #       CHUNK_NUM=$((CHUNK_NUM + 1))
+      #     done
+      #     echo "All chunks sent successfully!"
