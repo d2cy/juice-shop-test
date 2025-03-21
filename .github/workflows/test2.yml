@@ -142,7 +142,7 @@ jobs:
           #   --url '${{ secrets.JIRA_URL }}/rest/api/3/user/search?query=${{ secrets.EMAIL }}' \ 
           #   --user '${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET}}' \ 
           #   --header 'Accept: application/json' | jq '.[].accountId')
-          echo $ID
+          # echo $ID
           curl --request POST \
                 --url "${{ secrets.JIRA_URL }}/rest/api/3/issue" \
                 --user "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET }}" \
@@ -172,7 +172,7 @@ jobs:
                     "issuetype": {
                       "name": "Task"
                     },
-                    "assignee":{"accountId":"$ASSIGN_TO"},
+                    "assignee":{"accountId":'"$ASSIGN_TO"'},
                     "labels": ["SECBUG", "COPYRIGHT"]
                   }
                 }'
