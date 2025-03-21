@@ -134,7 +134,7 @@ jobs:
 
       - name: Create JIRA Ticket
         run: | 
-          ID=$(curl --request GET \
+          ASSIGN_TO=$(curl --request GET \
                     --url '${{ secrets.JIRA_URL }}/rest/api/3/user/search?query=${{ secrets.EMAIL }}' \
                     --user '${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET}}' \
                     --header 'Accept: application/json' | jq '.[].accountId')
@@ -143,39 +143,39 @@ jobs:
           #   --user '${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET}}' \ 
           #   --header 'Accept: application/json' | jq '.[].accountId')
           echo $ID
-          # curl --request POST \
-          #       --url "${{ secrets.JIRA_URL }}/rest/api/3/issue" \
-          #       --user "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET }}" \
-          #       --header "Accept: application/json" \
-          #       --header "Content-Type: application/json" \
-          #       --data '{
-          #         "fields": {
-          #           "project": {
-          #             "key": "'"${{ secrets.JIRA_PROJECT_KEY }}"'"
-          #           },
-          #           "summary": "Copyright Issue",
-          #           "description": {
-          #             "type": "doc",
-          #             "version": 1,
-          #             "content": [
-          #               {
-          #                 "type": "paragraph",
-          #                 "content": [
-          #                   {
-          #                     "type": "text",
-          #                     "text": "GitHub Issue: '"$GIT_ISSUE_URL"'\n\n"
-          #                   }
-          #                 ]
-          #               }
-          #             ]
-          #           },
-          #           "issuetype": {
-          #             "name": "Task"
-          #           }
-          #           "assignee":{"accountId":"$ASSIGN_TO"},
-          #           "labels": ["SECBUG", "COPYRIGHT"]
-          #         }
-          #       }'
+          curl --request POST \
+                --url "${{ secrets.JIRA_URL }}/rest/api/3/issue" \
+                --user "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET }}" \
+                --header "Accept: application/json" \
+                --header "Content-Type: application/json" \
+                --data '{
+                  "fields": {
+                    "project": {
+                      "key": "'"${{ secrets.JIRA_PROJECT_KEY }}"'"
+                    },
+                    "summary": "Copyright Issue",
+                    "description": {
+                      "type": "doc",
+                      "version": 1,
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "GitHub Issue: '"$GIT_ISSUE_URL"'\n\n"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "issuetype": {
+                      "name": "Task"
+                    }
+                    "assignee":{"accountId":"$ASSIGN_TO"},
+                    "labels": ["SECBUG", "COPYRIGHT"]
+                  }
+                }'
       # - name: Create JIRA Ticket
       #   env:
       #     JIRA_URL: ${{ secrets.JIRA_URL }}
