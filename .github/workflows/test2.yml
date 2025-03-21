@@ -135,9 +135,9 @@ jobs:
       - name: Create JIRA Ticket
         run: | 
           ID=$(curl --request GET \ 
-          --url '${{ secrets.JIRA_URL }}/rest/api/3/user/search?query=${{ secrets.EMAIL }}' \ 
-          --user '${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET}}' \ 
-          --header 'Accept: application/json' | jq '.[].accountId')
+            --url '${{ secrets.JIRA_URL }}/rest/api/3/user/search?query=${{ secrets.EMAIL }}' \ 
+            --user '${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET}}' \ 
+            --header 'Accept: application/json' | jq '.[].accountId')
           echo $ID
           # curl --request POST \
           #       --url "${{ secrets.JIRA_URL }}/rest/api/3/issue" \
