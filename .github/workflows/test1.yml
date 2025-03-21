@@ -1,13 +1,6 @@
 name: frontend License & Security Scan
 
 on:
-  push:
-    branches:
-      - master
-      - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 env:
   BASE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}"
