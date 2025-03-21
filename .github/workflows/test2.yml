@@ -130,7 +130,7 @@ jobs:
             -H "Accept: application/vnd.github.v3+json" \
             -d "{\"title\": \"$TITLE\", \"body\": $DESCRIPTION}" \
             "https://api.github.com/repos/${{ github.repository }}/issues")
-          GIT_ISSUE_URL=$(echo "$RESPONSE" | jq -r '.url')
+          GIT_ISSUE_URL=$(echo "$RESPONSE" | jq -r '.html_url')
           echo "GIT_ISSUE_URL=$GIT_ISSUE_URL" >> $GITHUB_ENV
 
       - name: Create JIRA Ticket
