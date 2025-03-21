@@ -109,16 +109,16 @@ jobs:
 
           echo "TOTAL_CHUNKS=$i" >> $GITHUB_ENV
 
-      - name: Send Chunks to Google Chat
-        env:
-          GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_WEBHOOK }}
-        run: |
-          for file in chunks_*.txt; do
-            MESSAGE=$(jq -Rs '.' "$file")  # Convert text to JSON-safe string
-            curl -X POST -H "Content-Type: application/json" \
-              -d "{\"text\": $MESSAGE}" "$GOOGLE_CHAT_WEBHOOK"
-            sleep 2  # Avoid hitting rate limits
-          done
+      # - name: Send Chunks to Google Chat
+      #   env:
+      #     GOOGLE_CHAT_WEBHOOK: ${{ secrets.GOOGLE_WEBHOOK }}
+      #   run: |
+      #     for file in chunks_*.txt; do
+      #       MESSAGE=$(jq -Rs '.' "$file")  # Convert text to JSON-safe string
+      #       curl -X POST -H "Content-Type: application/json" \
+      #         -d "{\"text\": $MESSAGE}" "$GOOGLE_CHAT_WEBHOOK"
+      #       sleep 2  # Avoid hitting rate limits
+      #     done
       - name: Create GitHub Issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -138,40 +138,40 @@ jobs:
           --url "${{ secrets.JIRA_URL }}/rest/api/3/user/search?query=${{ secrets.EMAIL }}" \ 
           --user '${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET}}' \ 
           --header 'Accept: application/json' | jq '.[].accountId')
-          
-          curl --request POST \
-                --url "${{ secrets.JIRA_URL }}/rest/api/3/issue" \
-                --user "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET }}" \
-                --header "Accept: application/json" \
-                --header "Content-Type: application/json" \
-                --data '{
-                  "fields": {
-                    "project": {
-                      "key": "'"${{ secrets.JIRA_PROJECT_KEY }}"'"
-                    },
-                    "summary": "Copyright Issue",
-                    "description": {
-                      "type": "doc",
-                      "version": 1,
-                      "content": [
-                        {
-                          "type": "paragraph",
-                          "content": [
-                            {
-                              "type": "text",
-                              "text": "GitHub Issue: '"$GIT_ISSUE_URL"'\n\n"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    "issuetype": {
-                      "name": "Task"
-                    }
-                    "assignee":{"accountId":"$ASSIGN_TO"},
-                    "labels": ["SECBUG", "COPYRIGHT"]
-                  }
-                }'
+          echo $ID
+          # curl --request POST \
+          #       --url "${{ secrets.JIRA_URL }}/rest/api/3/issue" \
+          #       --user "${{ secrets.JIRA_EMAIL }}:${{ secrets.JIRA_API_SECRET }}" \
+          #       --header "Accept: application/json" \
+          #       --header "Content-Type: application/json" \
+          #       --data '{
+          #         "fields": {
+          #           "project": {
+          #             "key": "'"${{ secrets.JIRA_PROJECT_KEY }}"'"
+          #           },
+          #           "summary": "Copyright Issue",
+          #           "description": {
+          #             "type": "doc",
+          #             "version": 1,
+          #             "content": [
+          #               {
+          #                 "type": "paragraph",
+          #                 "content": [
+          #                   {
+          #                     "type": "text",
+          #                     "text": "GitHub Issue: '"$GIT_ISSUE_URL"'\n\n"
+          #                   }
+          #                 ]
+          #               }
+          #             ]
+          #           },
+          #           "issuetype": {
+          #             "name": "Task"
+          #           }
+          #           "assignee":{"accountId":"$ASSIGN_TO"},
+          #           "labels": ["SECBUG", "COPYRIGHT"]
+          #         }
+          #       }'
       # - name: Create JIRA Ticket
       #   env:
       #     JIRA_URL: ${{ secrets.JIRA_URL }}
