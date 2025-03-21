@@ -131,6 +131,7 @@ jobs:
             -d "{\"title\": \"$TITLE\", \"body\": $DESCRIPTION}" \
             "https://api.github.com/repos/${{ github.repository }}/issues")
           GIT_ISSUE_URL=$(echo "$RESPONSE" | jq -r '.url')
+          echo "GIT_ISSUE_URL=$GIT_ISSUE_URL" >> $GITHUB_ENV
 
       - name: Create JIRA Ticket
         run: | 
